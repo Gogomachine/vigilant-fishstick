@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AML Report Generator — Case Walker</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Source+Code+Pro:wght@400;500;600&family=Crimson+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Source Code Pro', monospace; background: #f0f0f0; min-height: 100vh; }
+  .app { display: flex; min-height: 100vh; }
+
+  .panel {
+    width: 420px; min-width: 420px; background: #1a1a1f; color: #ccc;
+    overflow-y: auto; padding: 28px 24px 60px; border-right: 2px solid #333;
+    height: 100vh; position: sticky; top: 0;
+  }
+  .preview { flex: 1; background: #fff; overflow-y: auto; height: 100vh; }
+
+  .panel-logo { text-align: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #333; }
+  .panel-logo img { width: 140px; filter: invert(1) brightness(0.9); }
+  .panel-title { font-family: 'Playfair Display', serif; font-size: 13px; letter-spacing: 4px; text-transform: uppercase; color: #fff; margin-top: 8px; }
+  .panel-sub { font-size: 10px; color: #666; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; background: #111; border: 1px solid #333; color: #eee;
+    font-family: 'Source Code Pro', monospace; font-size: 13px;
+    padding: 10px 12px; outline: none; transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #c0272d; }
+  .form-group textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+  .form-section-title {
+    font-family: 'Playfair Display', serif; font-size: 11px; letter-spacing: 3px;
+    text-transform: uppercase; color: #c0272d; margin: 28px 0 14px;
+    padding-bottom: 8px; border-bottom: 1px solid #2a2a2a;
+  }
+  .form-section-title:first-of-type { margin-top: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .risk-input-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .risk-input-row input[type="text"] { flex: 1; }
+  .risk-input-row input[type="number"], .risk-input-row input[type="text"].pct-input { width: 70px; text-align: center; }
+  .risk-input-row .remove-btn, .token-input-row .remove-btn {
+    background: none; border: 1px solid #333; color: #666; width: 28px; height: 28px;
+    cursor: pointer; font-size: 14px; display: flex; align-items: center;
+    justify-content: center; transition: all 0.2s; flex-shrink: 0;
+  }
+  .risk-input-row .remove-btn:hover, .token-input-row .remove-btn:hover { border-color: #c0272d; color: #c0272d; }
+
+  .token-input-row { display: grid; grid-template-columns: 70px 90px 1fr 100px 28px; gap: 6px; margin-bottom: 8px; align-items: center; }
+
+  .add-btn {
+    background: none; border: 1px dashed #444; color: #888;
+    font-family: 'Source Code Pro', monospace; font-size: 11px; letter-spacing: 1px;
+    padding: 8px; width: 100%; cursor: pointer; transition: all 0.2s; margin-top: 4px;
+  }
+  .add-btn:hover { border-color: #c0272d; color: #c0272d; }
+
+  .sub-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #555; margin: 12px 0 8px; }
+
+  .action-bar { margin-top: 28px; }
+  .btn-print {
+    width: 100%; background: #c0272d; border: none; color: #fff;
+    font-family: 'Source Code Pro', monospace; font-size: 12px; letter-spacing: 2px;
+    text-transform: uppercase; padding: 14px; cursor: pointer; transition: background 0.2s;
+  }
+  .btn-print:hover { background: #a01f25; }
+
+  /* ═══ REPORT ═══ */
+  .report { max-width: 900px; margin: 0 auto; padding: 40px 40px 80px; position: relative; }
+  .report-header { text-align: center; padding: 36px 0 40px; border-bottom: 2px solid #111; margin-bottom: 40px; }
+  .r-title { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 600; letter-spacing: 6px; text-transform: uppercase; color: #111; margin-bottom: 6px; }
+  .r-subtitle { font-family: 'Crimson Pro', serif; font-size: 13px; color: #888; letter-spacing: 2px; text-transform: uppercase; }
+  .r-date { font-family: 'Source Code Pro', monospace; font-size: 11px; color: #888; margin-top: 14px; letter-spacing: 1px; }
+
+  .r-section { margin-bottom: 32px; }
+  .r-section-label {
+    font-family: 'Playfair Display', serif; font-size: 11px; font-weight: 600;
+    letter-spacing: 4px; text-transform: uppercase; color: #111;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
+  }
+  .r-section-label::after { content: ''; flex: 1; height: 1px; background: #e0e0e0; }
+
+  .r-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #e0e0e0; border: 1px solid #e0e0e0; overflow: hidden; }
+  .r-cell { background: #f7f7f7; padding: 18px 20px; }
+  .r-cell.full { grid-column: 1 / -1; }
+  .r-label { font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+  .r-val { font-family: 'Source Code Pro', monospace; font-size: 14px; color: #111; font-weight: 500; word-break: break-all; }
+  .r-val.addr { font-size: 13px; color: #444; }
+  .r-val.risk-colored { font-weight: 700; font-size: 20px; transition: color 0.4s; }
+
+  .r-finance { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: #e0e0e0; border: 1px solid #e0e0e0; overflow: hidden; }
+  .r-fin-cell { background: #f7f7f7; padding: 22px 20px; text-align: center; }
+  .r-fin-amt { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: #111; margin-bottom: 4px; }
+  .r-fin-label { font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #888; }
+
+  /* Risk */
+  .r-risk-box { background: #f7f7f7; border: 1px solid #e0e0e0; padding: 28px; display: flex; align-items: center; gap: 28px; }
+  .r-gauge { position: relative; width: 110px; height: 110px; flex-shrink: 0; }
+  .r-gauge svg { width: 110px; height: 110px; transform: rotate(-90deg); }
+  .r-gauge-bg { fill: none; stroke: #e0e0e0; stroke-width: 6; }
+  .r-gauge-fill { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 251; transition: all 0.8s ease; }
+  .r-gauge-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 900; transition: color 0.4s; }
+  .r-risk-right { flex: 1; }
+  .r-verdict { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; transition: color 0.4s; }
+  .r-verdict-sub { font-family: 'Source Code Pro', monospace; font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+
+  .r-flow-title {
+    font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; color: #888; margin: 20px 0 10px; padding-bottom: 6px;
+    border-bottom: 1px solid #e8e8e8;
+  }
+  .r-flow-title:first-of-type { margin-top: 14px; }
+  .r-breakdown { display: flex; flex-direction: column; gap: 8px; }
+  .r-risk-item { display: flex; align-items: center; gap: 10px; }
+  .r-risk-name { font-family: 'Source Code Pro', monospace; font-size: 11px; color: #444; width: 150px; flex-shrink: 0; }
+  .r-risk-usd { font-family: 'Source Code Pro', monospace; font-size: 10px; color: #999; width: 140px; flex-shrink: 0; text-align: right; }
+  .r-bar-track { flex: 1; height: 5px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
+  .r-bar-fill { height: 100%; border-radius: 3px; transition: all 0.6s ease; }
+  .r-risk-pct { font-family: 'Source Code Pro', monospace; font-size: 11px; font-weight: 600; width: 50px; text-align: right; transition: color 0.4s; }
+
+  /* Sanction badge */
+  .r-sanction-badge {
+    display: inline-block; background: #c0272d; color: #fff;
+    font-family: 'Source Code Pro', monospace; font-size: 10px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase; padding: 4px 10px;
+    margin-top: 8px;
+  }
+
+  .r-tokens { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #e0e0e0; border: 1px solid #e0e0e0; overflow: hidden; }
+  .r-token { background: #f7f7f7; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .r-tok-name { font-family: 'Source Code Pro', monospace; font-size: 13px; font-weight: 600; color: #111; }
+  .r-tok-tick { font-size: 10px; color: #888; letter-spacing: 1px; }
+  .r-tok-bal { font-family: 'Source Code Pro', monospace; font-size: 12px; color: #444; text-align: right; }
+  .r-tok-usd { font-family: 'Source Code Pro', monospace; font-size: 10px; color: #999; text-align: right; }
+
+  .r-review { background: #f7f7f7; border: 1px solid #e0e0e0; border-left: 3px solid #111; padding: 28px; }
+  .r-review p { font-family: 'Crimson Pro', serif; font-size: 16px; line-height: 1.8; color: #444; white-space: pre-wrap; }
+  .r-review-sig { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-family: 'Source Code Pro', monospace; font-size: 11px; color: #888; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+  .r-review-sig .dot { width: 6px; height: 6px; border-radius: 50%; background: #111; }
+
+  .r-footer { margin-top: 48px; padding-top: 24px; border-top: 2px solid #111; text-align: center; }
+  .r-footer-text { font-family: 'Source Code Pro', monospace; font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; }
+  .r-footer a { color: #111; text-decoration: none; font-weight: 600; }
+
+  .r-confidential { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-family: 'Playfair Display', serif; font-size: 90px; font-weight: 900; letter-spacing: 20px; text-transform: uppercase; color: rgba(0,0,0,0.02); pointer-events: none; white-space: nowrap; }
+  .empty-hint { color: #bbb; font-style: italic; }
+
+  @media print {
+    .panel { display: none !important; }
+    .app { display: block; }
+    .preview { height: auto; overflow: visible; }
+    .report { padding: 20px; }
+  }
+  @media (max-width: 900px) {
+    .app { flex-direction: column; }
+    .panel { width: 100%; min-width: auto; height: auto; position: static; border-right: none; border-bottom: 2px solid #333; }
+    .preview { height: auto; }
+    .r-grid, .r-finance, .r-tokens { grid-template-columns: 1fr; }
+    .r-risk-box { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══ PANEL ═══ -->
+  <div class="panel">
+    <div class="panel-logo">
+      <img src="logo.jpg" alt="Case Walker">
+      <div class="panel-title">Report Generator</div>
+      <div class="panel-sub">Заполни данные — отчёт обновится сразу</div>
+    </div>
+
+    <div class="form-section-title">Кошелёк</div>
+    <div class="form-group">
+      <label>Адрес</label>
+      <input type="text" id="f-address" value="0x098B716B8Aaf21512996dC57EB0615e2383E2f96" oninput="render()">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Сеть</label>
+        <select id="f-network" onchange="render()">
+          <option>Solana</option><option selected>Ethereum</option><option>Bitcoin</option>
+          <option>BSC</option><option>Polygon</option><option>Tron</option>
+          <option>Arbitrum</option><option>Base</option><option>Avalanche</option><option>TON</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Риск скор (0–100)</label>
+        <input type="number" id="f-risk" min="0" max="100" value="100" oninput="render()">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Первая активность</label>
+        <input type="text" id="f-first" value="2022-03-23 01:16 PM" oninput="render()">
+      </div>
+      <div class="form-group">
+        <label>Последняя активность</label>
+        <input type="text" id="f-last" value="2025-09-06 11:52 PM" oninput="render()">
+      </div>
+    </div>
+
+    <div class="form-section-title">Финансы</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Баланс ($)</label>
+        <input type="text" id="f-balance" value="207,704.54" oninput="render()">
+      </div>
+      <div class="form-group">
+        <label>Транзакций</label>
+        <input type="text" id="f-txcount" value="264" oninput="render()">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Принято ($)</label>
+        <input type="text" id="f-received" value="397,375,754.88" oninput="render()">
+      </div>
+      <div class="form-group">
+        <label>Отправлено ($)</label>
+        <input type="text" id="f-sent" value="397,168,050.34" oninput="render()">
+      </div>
+    </div>
+
+    <div class="form-section-title">Риски — Incoming</div>
+    <div id="risk-in-items"></div>
+    <button class="add-btn" onclick="addRiskIn()">+ Добавить</button>
+
+    <div class="form-section-title">Риски — Outgoing</div>
+    <div id="risk-out-items"></div>
+    <button class="add-btn" onclick="addRiskOut()">+ Добавить</button>
+
+    <div class="form-section-title">Токены</div>
+    <div id="token-items"></div>
+    <button class="add-btn" onclick="addToken()">+ Добавить токен</button>
+
+    <div class="form-section-title">Обзор от бота</div>
+    <div class="form-group">
+      <label>Текст обзора</label>
+      <textarea id="f-review" rows="6" oninput="render()">Адрес 0x098B716B включён в санкционный список OFAC и ассоциирован с группировкой Lazarus (Северная Корея). Через кошелёк прошло $397M, из которых 95.55% входящих средств поступили от санкционных адресов, 4.4% — из взломов. Исходящие средства направлялись на санкционные адреса (80.82%), связанные со взломами (14.01%), биржи (1.93%), микшеры (1.64%) и подозрительные адреса (1.59%).
+
+Рекомендация: полная блокировка, уведомление регулятора, подача SAR. Любые контрагенты данного адреса подлежат усиленной проверке (EDD).</textarea>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-print" onclick="window.print()">⎙ &nbsp;Печать / PDF</button>
+    </div>
+  </div>
+
+  <!-- ═══ PREVIEW ═══ -->
+  <div class="preview">
+    <div class="report" id="report">
+      <div class="r-confidential">CONFIDENTIAL</div>
+
+      <header class="report-header">
+        <div class="r-title">AML Investigation Report</div>
+        <div class="r-subtitle">Blockchain Forensics & Compliance Analysis</div>
+        <div class="r-date" id="r-date"></div>
+      </header>
+
+      <div class="r-section">
+        <div class="r-section-label">Информация о кошельке</div>
+        <div class="r-grid">
+          <div class="r-cell full">
+            <div class="r-label">Адрес</div>
+            <div class="r-val addr" id="r-address">—</div>
+          </div>
+          <div class="r-cell">
+            <div class="r-label">Сеть</div>
+            <div class="r-val" id="r-network">—</div>
+          </div>
+          <div class="r-cell">
+            <div class="r-label">Риск скор</div>
+            <div class="r-val risk-colored" id="r-riskscore">—</div>
+          </div>
+          <div class="r-cell">
+            <div class="r-label">Первая активность</div>
+            <div class="r-val" id="r-first">—</div>
+          </div>
+          <div class="r-cell">
+            <div class="r-label">Последняя активность</div>
+            <div class="r-val" id="r-last">—</div>
+          </div>
+          <div class="r-cell">
+            <div class="r-label">Баланс</div>
+            <div class="r-val" id="r-balance">—</div>
+          </div>
+          <div class="r-cell">
+            <div class="r-label">Кол-во транзакций</div>
+            <div class="r-val" id="r-txcount">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="r-section">
+        <div class="r-section-label">Финансовая сводка</div>
+        <div class="r-finance">
+          <div class="r-fin-cell">
+            <div class="r-fin-amt" id="r-received">—</div>
+            <div class="r-fin-label">Принято</div>
+          </div>
+          <div class="r-fin-cell">
+            <div class="r-fin-amt" id="r-sent">—</div>
+            <div class="r-fin-label">Отправлено</div>
+          </div>
+          <div class="r-fin-cell">
+            <div class="r-fin-amt" id="r-bal2">—</div>
+            <div class="r-fin-label">Баланс</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="r-section">
+        <div class="r-section-label">Анализ рисков</div>
+        <div class="r-risk-box">
+          <div class="r-gauge">
+            <svg viewBox="0 0 100 100">
+              <circle class="r-gauge-bg" cx="50" cy="50" r="40" />
+              <circle class="r-gauge-fill" id="r-gauge-fill" cx="50" cy="50" r="40" />
+            </svg>
+            <div class="r-gauge-num" id="r-gauge-num">—</div>
+          </div>
+          <div class="r-risk-right">
+            <div class="r-verdict" id="r-verdict">—</div>
+            <div class="r-verdict-sub" id="r-verdict-sub"></div>
+            <div id="r-sanction-badge"></div>
+
+            <div class="r-flow-title" id="r-in-title" style="display:none">▼ Incoming</div>
+            <div class="r-breakdown" id="r-breakdown-in"></div>
+
+            <div class="r-flow-title" id="r-out-title" style="display:none">▲ Outgoing</div>
+            <div class="r-breakdown" id="r-breakdown-out"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="r-section">
+        <div class="r-section-label">Токены на кошельке</div>
+        <div class="r-tokens" id="r-tokens">
+          <div class="r-token"><span class="empty-hint">Добавьте токены слева</span></div>
+        </div>
+      </div>
+
+      <div class="r-section">
+        <div class="r-section-label">Обзор от Case Walker Bot</div>
+        <div class="r-review">
+          <p id="r-review">—</p>
+          <div class="r-review-sig">
+            <span class="dot"></span>
+            Case Walker AI — Automated Forensic Analysis Engine v2.4
+          </div>
+        </div>
+      </div>
+
+      <footer class="r-footer">
+        <div style="text-align:center;color:#aaa;font-size:14px;letter-spacing:8px;margin:8px 0">— ◆ —</div>
+        <p class="r-footer-text" style="margin-top:8px">
+          Case Walker Investigation &nbsp;·&nbsp;
+          <a href="https://t.me/casewalkerinvestigation">@casewalkerinvestigation</a>
+          &nbsp;·&nbsp; Crypto Forensics & AML Compliance
+        </p>
+        <p class="r-footer-text" style="margin-top:8px;opacity:0.5">
+          This report is for informational purposes only. Not financial or legal advice.
+        </p>
+      </footer>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const COLORS = {
+    low:    { color: '#1a8c3f', glow: 'rgba(26,140,63,0.15)' },
+    medium: { color: '#c47f17', glow: 'rgba(196,127,23,0.15)' },
+    high:   { color: '#c0272d', glow: 'rgba(192,39,45,0.15)' }
+  };
+  function getRiskLevel(s) { if(s<=30) return 'low'; if(s<=60) return 'medium'; return 'high'; }
+  function getRiskColor(s) { return COLORS[getRiskLevel(s)]; }
+  function barColor(pct) { if(pct>20) return COLORS.high.color; if(pct>5) return COLORS.medium.color; return COLORS.low.color; }
+
+  let risksIn=[], risksOut=[], tokens=[], riId=0, roId=0, tId=0;
+
+  function init() {
+    addRiskIn('Sanction list', 95.55, '380,442,560');
+    addRiskIn('Hack', 4.4, '17,511,345');
+    addRiskIn('Exchange', 0.05, '204,460');
+    addRiskIn('Gambling', 0.01, '4,430');
+
+    addRiskOut('Sanction list', 80.82, '321,631,682');
+    addRiskOut('Hack', 14.01, '55,763,522');
+    addRiskOut('Exchange', 1.93, '7,667,250');
+    addRiskOut('Mixing service', 1.64, '6,546,351');
+    addRiskOut('Suspicious', 1.59, '6,343,620');
+
+    addToken('ETH', 'Ethereum', '101.80242993 ETH', '207,704.44');
+    addToken('AKITA', 'Akita Inu', '13,300,000 AKITA', '0.10');
+    addToken('wETH', 'Wrapped Ether', '0.0000001 wETH', '<0.01');
+    addToken('JUP', 'Jupiter', '1 JUP', '<0.01');
+
+    const now = new Date();
+    const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    document.getElementById('r-date').textContent =
+      `Report generated: ${String(now.getDate()).padStart(2,'0')} ${m[now.getMonth()]} ${now.getFullYear()} | Case #CW-${now.getFullYear()}-${String(Math.floor(Math.random()*9999)).padStart(4,'0')}`;
+    render();
+  }
+
+  // ─── Risks In ───
+  function addRiskIn(n,p,u){ risksIn.push({id:riId++,name:n||'',pct:p||0,usd:u||''}); renderRiskInInputs(); render(); }
+  function removeRiskIn(id){ risksIn=risksIn.filter(r=>r.id!==id); renderRiskInInputs(); render(); }
+  function updateRiskIn(id,f,v){ const r=risksIn.find(r=>r.id===id); if(r){ if(f==='pct') r.pct=Math.max(0,Math.min(100,parseFloat(v)||0)); else r[f]=v; } render(); }
+  function renderRiskInInputs(){
+    document.getElementById('risk-in-items').innerHTML=risksIn.map(r=>`
+      <div class="risk-input-row">
+        <input type="text" value="${r.name}" placeholder="Категория" oninput="updateRiskIn(${r.id},'name',this.value)">
+        <input type="text" class="pct-input" value="${r.pct}" placeholder="%" oninput="updateRiskIn(${r.id},'pct',this.value)">
+        <input type="text" value="${r.usd}" placeholder="USD" style="width:110px" oninput="updateRiskIn(${r.id},'usd',this.value)">
+        <button class="remove-btn" onclick="removeRiskIn(${r.id})">×</button>
+      </div>`).join('');
+  }
+
+  // ─── Risks Out ───
+  function addRiskOut(n,p,u){ risksOut.push({id:roId++,name:n||'',pct:p||0,usd:u||''}); renderRiskOutInputs(); render(); }
+  function removeRiskOut(id){ risksOut=risksOut.filter(r=>r.id!==id); renderRiskOutInputs(); render(); }
+  function updateRiskOut(id,f,v){ const r=risksOut.find(r=>r.id===id); if(r){ if(f==='pct') r.pct=Math.max(0,Math.min(100,parseFloat(v)||0)); else r[f]=v; } render(); }
+  function renderRiskOutInputs(){
+    document.getElementById('risk-out-items').innerHTML=risksOut.map(r=>`
+      <div class="risk-input-row">
+        <input type="text" value="${r.name}" placeholder="Категория" oninput="updateRiskOut(${r.id},'name',this.value)">
+        <input type="text" class="pct-input" value="${r.pct}" placeholder="%" oninput="updateRiskOut(${r.id},'pct',this.value)">
+        <input type="text" value="${r.usd}" placeholder="USD" style="width:110px" oninput="updateRiskOut(${r.id},'usd',this.value)">
+        <button class="remove-btn" onclick="removeRiskOut(${r.id})">×</button>
+      </div>`).join('');
+  }
+
+  // ─── Tokens ───
+  function addToken(n,t,b,u){ tokens.push({id:tId++,name:n||'',ticker:t||'',balance:b||'',usd:u||''}); renderTokenInputs(); render(); }
+  function removeToken(id){ tokens=tokens.filter(t=>t.id!==id); renderTokenInputs(); render(); }
+  function updateToken(id,f,v){ const t=tokens.find(t=>t.id===id); if(t) t[f]=v; render(); }
+  function renderTokenInputs(){
+    document.getElementById('token-items').innerHTML=tokens.map(t=>`
+      <div class="token-input-row">
+        <input type="text" value="${t.name}" placeholder="ETH" oninput="updateToken(${t.id},'name',this.value)">
+        <input type="text" value="${t.ticker}" placeholder="Ethereum" oninput="updateToken(${t.id},'ticker',this.value)">
+        <input type="text" value="${t.balance}" placeholder="101.8 ETH" oninput="updateToken(${t.id},'balance',this.value)">
+        <input type="text" value="${t.usd}" placeholder="USD" oninput="updateToken(${t.id},'usd',this.value)">
+        <button class="remove-btn" onclick="removeToken(${t.id})">×</button>
+      </div>`).join('');
+  }
+
+  function renderBreakdown(container, items) {
+    if(!items.length){ container.innerHTML='<span class="empty-hint">Нет данных</span>'; return; }
+    container.innerHTML = items.map(r => {
+      const c = barColor(r.pct);
+      const usdStr = r.usd ? `$${r.usd}` : '';
+      return `<div class="r-risk-item">
+        <span class="r-risk-name">${r.name||'—'}</span>
+        <span class="r-risk-usd">${usdStr}</span>
+        <div class="r-bar-track"><div class="r-bar-fill" style="width:${Math.min(r.pct,100)}%;background:${c}"></div></div>
+        <span class="r-risk-pct" style="color:${c}">${r.pct}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Render ───
+  function render() {
+    const v = id => document.getElementById(id)?.value || '';
+
+    document.getElementById('r-address').textContent = v('f-address') || '—';
+    document.getElementById('r-network').textContent = v('f-network') || '—';
+    document.getElementById('r-first').textContent = v('f-first') || '—';
+    document.getElementById('r-last').textContent = v('f-last') || '—';
+    document.getElementById('r-balance').textContent = v('f-balance') ? '$'+v('f-balance') : '—';
+    document.getElementById('r-txcount').textContent = v('f-txcount') || '—';
+    document.getElementById('r-received').textContent = v('f-received') ? '$'+v('f-received') : '—';
+    document.getElementById('r-sent').textContent = v('f-sent') ? '$'+v('f-sent') : '—';
+    document.getElementById('r-bal2').textContent = v('f-balance') ? '$'+v('f-balance') : '—';
+
+    const score = parseInt(v('f-risk')) || 0;
+    const rc = getRiskColor(score);
+
+    const riskEl = document.getElementById('r-riskscore');
+    riskEl.textContent = score ? score + ' / 100' : '— / 100';
+    riskEl.style.color = score ? rc.color : '#111';
+
+    const circ = 251, off = circ - (circ * score / 100);
+    const gf = document.getElementById('r-gauge-fill');
+    gf.setAttribute('stroke-dashoffset', off);
+    gf.style.stroke = rc.color;
+    gf.style.filter = `drop-shadow(0 0 8px ${rc.glow})`;
+
+    document.getElementById('r-gauge-num').textContent = score || '—';
+    document.getElementById('r-gauge-num').style.color = rc.color;
+
+    let verdict='—', sub='';
+    if(score>0 && score<=30){ verdict='LOW RISK'; sub='Стандартная проверка'; }
+    else if(score<=60){ verdict='MEDIUM RISK'; sub='Усиленный мониторинг'; }
+    else if(score>60){ verdict='HIGH RISK'; sub='Требуется расширенная проверка'; }
+    document.getElementById('r-verdict').textContent = verdict;
+    document.getElementById('r-verdict').style.color = score ? rc.color : '#111';
+    document.getElementById('r-verdict-sub').textContent = sub;
+
+    // Sanction badge
+    const hasSanction = risksIn.some(r=>r.name.toLowerCase().includes('sanction')) || risksOut.some(r=>r.name.toLowerCase().includes('sanction'));
+    document.getElementById('r-sanction-badge').innerHTML = hasSanction
+      ? '<span class="r-sanction-badge">⚠ OFAC SANCTION LIST · NORTH KOREA</span>' : '';
+
+    // Breakdowns
+    const inT = document.getElementById('r-in-title');
+    const outT = document.getElementById('r-out-title');
+    inT.style.display = risksIn.length ? 'block' : 'none';
+    outT.style.display = risksOut.length ? 'block' : 'none';
+    renderBreakdown(document.getElementById('r-breakdown-in'), risksIn);
+    renderBreakdown(document.getElementById('r-breakdown-out'), risksOut);
+
+    // Tokens
+    const tc = document.getElementById('r-tokens');
+    const vis = tokens.filter(t=>t.name);
+    if(vis.length){
+      tc.innerHTML = vis.map(t=>`
+        <div class="r-token">
+          <div><div class="r-tok-name">${t.name}</div><div class="r-tok-tick">${t.ticker.toUpperCase()}</div></div>
+          <div><div class="r-tok-bal">${t.balance}</div><div class="r-tok-usd">${t.usd ? '$'+t.usd : ''}</div></div>
+        </div>`).join('');
+    } else {
+      tc.innerHTML = '<div class="r-token" style="grid-column:1/-1"><span class="empty-hint">Добавьте токены слева</span></div>';
+    }
+
+    document.getElementById('r-review').textContent = v('f-review') || '—';
+  }
+
+  init();
+</script>
+</body>
+</html>
